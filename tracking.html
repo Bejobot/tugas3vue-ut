@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Delivery Order - Universitas Terbuka</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="tracking-app">
+        <header class="main-header">
+            <div class="container">
+                <h1>🚚 Tracking Delivery Order</h1>
+                <nav class="breadcrumb">
+                    <a href="index.html">Home</a> / <span>Tracking DO</span>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="container">
+                <!-- Add New DO Form -->
+                <div class="form-card">
+                    <h2>Tambah Delivery Order Baru</h2>
+                    <form @submit.prevent="addDeliveryOrder">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Nomor DO:</label>
+                                <input type="text" v-model="nomorDO" disabled class="input-disabled">
+                                <small>Nomor DO akan di-generate otomatis</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>NIM: <span class="required">*</span></label>
+                                <input type="text" v-model="formData.nim" required maxlength="9" placeholder="Contoh: 123456789">
+                                <span v-if="validationErrors.nim" class="error-text">{{ validationErrors.nim }}</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Nama: <span class="required">*</span></label>
+                                <input type="text" v-model="formData.nama" required placeholder="Nama lengkap">
+                                <span v-if="validationErrors.nama" class="error-text">{{ validationErrors.nama }}</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Ekspedisi: <span class="required">*</span></label>
+                                <select v-model="formData.ekspedisi" required>
+                                    <option value="">Pilih Ekspedisi</option>
+                                    <option v-for="exp in pengirimanList" :key="exp.kode" :value="exp.kode">
+                                        {{ exp.nama }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Paket Bahan Ajar: <span class="required">*</span></label>
+                                <select v-model="formData.paket" required @change="onPaketChange">
+                                    <option value="">Pilih Paket</option>
+                                    <option v-for="pkt in paket" :key="pkt.kode" :value="pkt.kode">
+                                        {{ pkt.kode }} - {{ pkt.nama }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tanggal Kirim: <span class="required">*</span></label>
+                                <input type="date" v-model="formData.tanggalKirim" required>
+                            </div>
+                        </div>
+
+                        <!-- Paket Detail -->
+                        <div v-if="selectedPaket" class="paket-detail">
+                            <h4>Detail Paket: {{ selectedPaket.nama }}</h4>
+                            <div class="paket-info">
+                                <div class="paket-isi">
+                                    <strong>Isi Paket:</strong>
+                                    <ul>
+                                        <li v-for="kodeMk in selectedPaket.isi" :key="kodeMk">
+                                            {{ kodeMk }} - {{ getMataKuliahName(kodeMk) }}
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="paket-harga">
+                                    <strong>Total Harga:</strong>
+                                    <div class="harga-value">Rp {{ formatNumber(selectedPaket.harga) }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" @click="resetForm" class="btn btn-secondary">Reset</button>
+                            <button type="submit" class="btn btn-primary">Tambah DO</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- DO List -->
+                <div class="do-list-section">
+                    <h2>Daftar Delivery Order</h2>
+                    
+                    <div v-if="trackingList.length === 0" class="empty-state">
+                        <p>Belum ada delivery order yang dibuat</p>
+                    </div>
+
+                    <div v-else class="do-grid">
+                        <div v-for="(do_item, index) in trackingList" :key="do_item.nomorDO" class="do-card">
+                            <div class="do-header">
+                                <div class="do-number">
+                                    <strong>{{ do_item.nomorDO }}</strong>
+                                    <span class="do-status" :class="getStatusClass(do_item.status)">
+                                        {{ do_item.status }}
+                                    </span>
+                                </div>
+                                <div class="do-date">{{ do_item.tanggalKirim }}</div>
+                            </div>
+
+                            <div class="do-body">
+                                <div class="do-info-row">
+                                    <span class="label">NIM:</span>
+                                    <span class="value">{{ do_item.nim }}</span>
+                                </div>
+                                <div class="do-info-row">
+                                    <span class="label">Nama:</span>
+                                    <span class="value">{{ do_item.nama }}</span>
+                                </div>
+                                <div class="do-info-row">
+                                    <span class="label">Ekspedisi:</span>
+                                    <span class="value">{{ getEkspedisiName(do_item.ekspedisi) }}</span>
+                                </div>
+                                <div class="do-info-row">
+                                    <span class="label">Paket:</span>
+                                    <span class="value">{{ do_item.paket }}</span>
+                                </div>
+                                <div class="do-info-row">
+                                    <span class="label">Total:</span>
+                                    <span class="value total-harga">Rp {{ formatNumber(do_item.total) }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Tracking History -->
+                            <div v-if="do_item.perjalanan && do_item.perjalanan.length > 0" class="tracking-history">
+                                <h5>Riwayat Pengiriman:</h5>
+                                <div class="timeline">
+                                    <div v-for="(tracking, idx) in do_item.perjalanan" :key="idx" class="timeline-item">
+                                        <div class="timeline-time">{{ tracking.waktu }}</div>
+                                        <div class="timeline-desc">{{ tracking.keterangan }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="main-footer">
+            <div class="container">
+                <p>&copy; 2025 Universitas Terbuka. All rights reserved. | <a href="index.html">Kembali ke Home</a></p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="js/dataBahanAjar.js"></script>
+    <script src="js/tracking-app.js"></script>
+</body>
+</html>
